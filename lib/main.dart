@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:tflite/tflite.dart';
 import 'package:image/image.dart' as img;
 
+import 'strings.dart' as appStrings;
+
 void main() => runApp(MaterialApp(
       home: HomeScreen(),
     ));
@@ -17,18 +19,33 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   File pickedImage;
+
+  final picker = ImagePicker();
   bool isImageLoaded = false;
 
   List _result;
 
-  String name = "";
+  String label = "";
   String confidence = "";
 
+  int _selectedIndex = 0;
+
   getImageFromGallery() async {
-    var tempStore = await ImagePicker().getImage(source: ImageSource.gallery);
+    var imageGallery =
+        await ImagePicker().getImage(source: ImageSource.gallery);
 
     setState(() {
-      pickedImage = File(tempStore.path);
+      pickedImage = File(imageGallery.path);
+      isImageLoaded = true;
+      applyModelOnImage(pickedImage);
+    });
+  }
+
+  getImageFromCamera() async {
+    var imageCamera = await picker.getImage(source: ImageSource.camera);
+
+    setState(() {
+      pickedImage = File(imageCamera.path);
       isImageLoaded = true;
       applyModelOnImage(pickedImage);
     });
@@ -46,12 +63,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _result = resultOnImage;
-      name = _result[0]["label"];
+      label = _result[0]["label"];
       confidence =
           (_result[0]["confidence"] * 100).toString().substring(0, 5) + "%";
       print('result');
       print(_result);
     });
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    switch (_selectedIndex) {
+      case 0:
+        getImageFromCamera();
+        break;
+      case 1:
+        getImageFromGallery();
+        break;
+      default:
+    }
   }
 
   Uint8List imageToByteListFloat32(
@@ -79,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   loadModel() async {
     var result = await Tflite.loadModel(
-      labels: "assets/saved_model.txt",
+      labels: "assets/labels.txt",
       model: "assets/saved_model.tflite",
     );
 
@@ -97,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Lobe AI - Tensorflow Lite',
+          appStrings.appTitle, // Set app Title
         ),
       ),
       body: Container(
@@ -124,13 +156,23 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(
               height: 30,
             ),
-            Text('Name: $name\nConfidence: $confidence')
+            Text('Label: $label\nConfidence: $confidence')
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: getImageFromGallery,
-        child: Icon(Icons.photo_album),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera),
+            label: 'Camera',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.photo_album),
+            label: 'Gallery',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
       ),
     );
   }
